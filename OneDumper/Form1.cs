@@ -28,7 +28,9 @@ namespace OneDumper
         int Default = 1,
             Error = 2,
             Success = 3,
-            Warning = 4;
+            Warning = 4,
+            Threads = 0;
+        bool Connected = true;
 
         ListViewItem lastItemChecked;
         List<string> devices = new List<string>();
@@ -41,6 +43,9 @@ namespace OneDumper
             InitializeComponent();
             log.SelectionChanged += log_disableSelection;
             partList.SelectionChanged += parts_disableSelection;
+            backup_type.SelectedIndex = 0;
+            compression_level.SelectedIndex = 0;
+            detectThreadLimit();
             writeLog("Program Başlatıldı.", Default);
             getProgrammersAsync();
             reloadCOMPorts(null,null);
@@ -57,6 +62,14 @@ namespace OneDumper
             programmerList.ItemCheck += programmerList_ItemCheck;
             programmerList.ItemChecked += programmerList_ItemCheckedAsync;
     }
+
+        void detectThreadLimit()
+        {
+            foreach (var item in new System.Management.ManagementObjectSearcher("Select * from Win32_Processor").Get())
+            {
+                Threads += int.Parse(item["NumberOfCores"].ToString());
+            }
+        }
         
         async Task downloadFileAsync(string file,string output,bool call=false)
         {
@@ -103,7 +116,7 @@ namespace OneDumper
             string output = await runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --rawxml=" + xml, tmpDir);
                 if (output.Contains("All Finished Successfully"))
                 {
-                    writeLog("Bölüm Yedeklendi : " + label, Success);
+                    writeLog("Bölüm Yedeklendi : " + label, Default);
                 }
                 else
                 {
@@ -332,6 +345,9 @@ namespace OneDumper
 
         private async void materialRaisedButton1_ClickAsync(object sender, EventArgs e)
         {
+            backup_type.Enabled = false;
+            compression_level.Enabled = false;
+            Dictionary<string, string> partitions = new Dictionary<string, string>();
             bool doAction = false,
                     error=false;
             foreach (DataGridViewRow row in partList.Rows)
@@ -341,11 +357,48 @@ namespace OneDumper
                     if (error) break;
                     if(!doAction) doAction = true;
                     error=await backupPartitionAsync(row.Cells["sector_size"].Value.ToString(), row.Cells["sector_offset"].Value.ToString(), row.Cells["filename"].Value.ToString(), row.Cells["partition"].Value.ToString(), row.Cells["partition_sectors"].Value.ToString(), row.Cells["partition_number"].Value.ToString(), row.Cells["size_kb"].Value.ToString(), row.Cells["sparse"].Value.ToString(), row.Cells["start_byte"].Value.ToString(), row.Cells["start_sector"].Value.ToString());
+                    if (!error)
+                    {
+                        partitions.Add(row.Cells["partition"].Value.ToString(), File.ReadAllText(tmpDir + "/" + (row.Cells["filename"].Value.ToString()),Encoding.Default));
+                        File.Delete(tmpDir + "/" + (row.Cells["filename"].Value.ToString()));
+                    }
                 }
             }
             if(doAction && !error)
             {
-                writeLog("Yedekleme İşlemi Tamamlandı.", Success);
+                writeLog("İmajlar Sıkıştırılıyor.", Warning);
+                string joined = null;
+                foreach(KeyValuePair<string, string> part in partitions)
+                {
+                    joined += part.Value;
+                }
+                File.WriteAllBytes(tmpDir+"/joined.img", Encoding.Default.GetBytes(joined));
+
+                int level = 0;
+                if (compression_level.SelectedIndex == 0)
+                {
+                    level = 17;
+                }
+                else if (compression_level.SelectedIndex == 1)
+                {
+                    level = 20;
+                }
+                else if (compression_level.SelectedIndex == 2)
+                {
+                    level = 22;
+                }
+                await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f --rm -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
+                if (!(new FileInfo(tmpDir+"/joined.comp")).Length.Equals(0))
+                {
+                    writeLog("Yedekleme İşlemi Tamamlandı.", Success);
+                }
+                else
+                {
+                    writeLog("Sıkıştırma İşlemi Başarısız. (Bellek Yetersiz)", Error);
+                }
+                backup_type.Enabled = true;
+                compression_level.Enabled = true;
+                
             }
             else if (doAction && error)
             {
@@ -415,7 +468,9 @@ namespace OneDumper
         }
 
         private void materialRaisedButton4_ClickAsync(object sender, EventArgs e)
-        {            
+        {
+            if (!Directory.Exists(tmpDir)) Directory.CreateDirectory(tmpDir).Attributes = FileAttributes.Directory | FileAttributes.Hidden;
+
             if (String.IsNullOrEmpty(deviceList.Text))
             {
                 writeLog("Cihaz Seçilmedi.", Error);
@@ -439,41 +494,38 @@ namespace OneDumper
             programmerList.Enabled = false;
             materialRaisedButton4.Enabled = false;
 
-            if (!Directory.Exists(tmpDir)) Directory.CreateDirectory(tmpDir);
             writeLog("Cihaza Bağlanılıyor : " + comPort, Warning);
-            writeLog("Sahara Protokolü Başlatılıyor : " + selectedProgrammer, Warning);
-            /*
-            string checkCom = await runCommand("Library/OneLoader.exe", "--port=\\\\.\\" + comPort, appPath);
-            if (checkCom.Contains("All Finished Successfully"))
+
+            if (!Connected)
             {
-                writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
-                materialRaisedButton1.Enabled = true;
-                getGPTAsync();
+                writeLog("Sahara Protokolü Başlatılıyor : " + selectedProgrammer, Warning);
+
+                runCommand("Library/QSaharaServer.exe", "-p \\\\.\\" + comPort + " -s 13:" + programmerPrefix + "/" + selectedProgrammer, appPath, delegate (object s, EventArgs a)
+                    {
+                        Process p = (Process)s;
+                        if (p.StandardOutput.ReadToEnd().Contains("Sahara protocol completed"))
+                        {
+                            writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
+                            materialRaisedButton1.Enabled = true;
+                            getGPTAsync();
+                        }
+                        else
+                        {
+                            writeLog("Programmer Hatalı, Cihazı Yeniden EDL Moduna Alınız.", Error);
+                            COMPortReloader.Enabled = true;
+                            COMPortReloader.Start();
+                            deviceList.Enabled = true;
+                            programmerList.Enabled = true;
+                            materialRaisedButton4.Enabled = true;
+                            materialRaisedButton1.Enabled = false;
+                        }
+                    });
             }
             else
             {
-                */
-            runCommand("Library/QSaharaServer.exe", "-p \\\\.\\" + comPort + " -s 13:" + programmerPrefix + "/" + selectedProgrammer, appPath, delegate (object s, EventArgs a)
-                {
-                    Process p = (Process)s;
-                    if (p.StandardOutput.ReadToEnd().Contains("Sahara protocol completed"))
-                    {
-                        writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
-                        materialRaisedButton1.Enabled = true;
-                        getGPTAsync();
-                    }
-                    else
-                    {
-                        writeLog("Programmer Hatalı, Cihazı Yeniden EDL Moduna Alınız.", Error);
-                        COMPortReloader.Enabled = true;
-                        COMPortReloader.Start();
-                        deviceList.Enabled = true;
-                        programmerList.Enabled = true;
-                        materialRaisedButton4.Enabled = true;
-                        materialRaisedButton1.Enabled = false;
-                    }
-                });
-            //}
+                writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
+                getGPTAsync();
+            }
         }
 
         private void programmerList_ItemCheck(object sender, ItemCheckEventArgs e)

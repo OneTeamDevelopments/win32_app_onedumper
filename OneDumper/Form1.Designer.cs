@@ -61,6 +61,11 @@
             this.type = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.date = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.message = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.materialLabel3 = new MaterialSkin.Controls.MaterialLabel();
+            this.materialLabel4 = new MaterialSkin.Controls.MaterialLabel();
+            this.backup_type = new System.Windows.Forms.ComboBox();
+            this.compression_level = new System.Windows.Forms.ComboBox();
+            this.multithread = new MaterialSkin.Controls.MaterialCheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.partList)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.log)).BeginInit();
             this.SuspendLayout();
@@ -93,7 +98,7 @@
             this.partList.RowHeadersWidthSizeMode = System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.AutoSizeToAllHeaders;
             this.partList.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.partList.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.partList.Size = new System.Drawing.Size(636, 373);
+            this.partList.Size = new System.Drawing.Size(636, 372);
             this.partList.TabIndex = 0;
             // 
             // partition
@@ -197,7 +202,7 @@
             this.materialLabel1.Depth = 0;
             this.materialLabel1.Font = new System.Drawing.Font("Roboto", 11F);
             this.materialLabel1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(222)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
-            this.materialLabel1.Location = new System.Drawing.Point(12, 142);
+            this.materialLabel1.Location = new System.Drawing.Point(12, 136);
             this.materialLabel1.MouseState = MaterialSkin.MouseState.HOVER;
             this.materialLabel1.Name = "materialLabel1";
             this.materialLabel1.Size = new System.Drawing.Size(92, 19);
@@ -210,7 +215,7 @@
             this.materialLabel2.Depth = 0;
             this.materialLabel2.Font = new System.Drawing.Font("Roboto", 11F);
             this.materialLabel2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(222)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
-            this.materialLabel2.Location = new System.Drawing.Point(12, 76);
+            this.materialLabel2.Location = new System.Drawing.Point(16, 76);
             this.materialLabel2.MouseState = MaterialSkin.MouseState.HOVER;
             this.materialLabel2.Name = "materialLabel2";
             this.materialLabel2.Size = new System.Drawing.Size(46, 19);
@@ -265,7 +270,7 @@
             // 
             this.deviceList.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.deviceList.FormattingEnabled = true;
-            this.deviceList.Location = new System.Drawing.Point(16, 106);
+            this.deviceList.Location = new System.Drawing.Point(16, 104);
             this.deviceList.Name = "deviceList";
             this.deviceList.Size = new System.Drawing.Size(242, 21);
             this.deviceList.TabIndex = 96;
@@ -285,11 +290,11 @@
             listViewGroup7,
             listViewGroup8});
             this.programmerList.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.None;
-            this.programmerList.Location = new System.Drawing.Point(16, 168);
+            this.programmerList.Location = new System.Drawing.Point(16, 163);
             this.programmerList.MultiSelect = false;
             this.programmerList.Name = "programmerList";
             this.programmerList.ShowItemToolTips = true;
-            this.programmerList.Size = new System.Drawing.Size(327, 281);
+            this.programmerList.Size = new System.Drawing.Size(327, 169);
             this.programmerList.TabIndex = 97;
             this.programmerList.UseCompatibleStateImageBehavior = false;
             this.programmerList.View = System.Windows.Forms.View.Details;
@@ -331,7 +336,7 @@
             // 
             this.materialRaisedButton4.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.materialRaisedButton4.Depth = 0;
-            this.materialRaisedButton4.Location = new System.Drawing.Point(264, 102);
+            this.materialRaisedButton4.Location = new System.Drawing.Point(264, 100);
             this.materialRaisedButton4.MouseState = MaterialSkin.MouseState.HOVER;
             this.materialRaisedButton4.Name = "materialRaisedButton4";
             this.materialRaisedButton4.Primary = true;
@@ -400,11 +405,86 @@
             this.message.Resizable = System.Windows.Forms.DataGridViewTriState.False;
             this.message.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             // 
+            // materialLabel3
+            // 
+            this.materialLabel3.AutoSize = true;
+            this.materialLabel3.Depth = 0;
+            this.materialLabel3.Font = new System.Drawing.Font("Roboto", 11F);
+            this.materialLabel3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(222)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.materialLabel3.Location = new System.Drawing.Point(16, 344);
+            this.materialLabel3.MouseState = MaterialSkin.MouseState.HOVER;
+            this.materialLabel3.Name = "materialLabel3";
+            this.materialLabel3.Size = new System.Drawing.Size(84, 19);
+            this.materialLabel3.TabIndex = 104;
+            this.materialLabel3.Text = "Yedek Türü";
+            // 
+            // materialLabel4
+            // 
+            this.materialLabel4.AutoSize = true;
+            this.materialLabel4.Depth = 0;
+            this.materialLabel4.Font = new System.Drawing.Font("Roboto", 11F);
+            this.materialLabel4.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(222)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.materialLabel4.Location = new System.Drawing.Point(16, 402);
+            this.materialLabel4.MouseState = MaterialSkin.MouseState.HOVER;
+            this.materialLabel4.Name = "materialLabel4";
+            this.materialLabel4.Size = new System.Drawing.Size(77, 19);
+            this.materialLabel4.TabIndex = 105;
+            this.materialLabel4.Text = "Sıkıştırma";
+            // 
+            // backup_type
+            // 
+            this.backup_type.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.backup_type.FormattingEnabled = true;
+            this.backup_type.Items.AddRange(new object[] {
+            "QFIL",
+            "Fastboot",
+            "QFIL + Fastboot"});
+            this.backup_type.Location = new System.Drawing.Point(16, 371);
+            this.backup_type.Name = "backup_type";
+            this.backup_type.Size = new System.Drawing.Size(327, 21);
+            this.backup_type.TabIndex = 106;
+            // 
+            // compression_level
+            // 
+            this.compression_level.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.compression_level.FormattingEnabled = true;
+            this.compression_level.Items.AddRange(new object[] {
+            "Normal",
+            "Yüksek",
+            "En Yüksek"});
+            this.compression_level.Location = new System.Drawing.Point(16, 427);
+            this.compression_level.Name = "compression_level";
+            this.compression_level.Size = new System.Drawing.Size(205, 21);
+            this.compression_level.TabIndex = 107;
+            // 
+            // multithread
+            // 
+            this.multithread.AutoSize = true;
+            this.multithread.Checked = true;
+            this.multithread.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.multithread.Depth = 0;
+            this.multithread.Font = new System.Drawing.Font("Roboto", 10F);
+            this.multithread.Location = new System.Drawing.Point(235, 421);
+            this.multithread.Margin = new System.Windows.Forms.Padding(0);
+            this.multithread.MouseLocation = new System.Drawing.Point(-1, -1);
+            this.multithread.MouseState = MaterialSkin.MouseState.HOVER;
+            this.multithread.Name = "multithread";
+            this.multithread.Ripple = true;
+            this.multithread.Size = new System.Drawing.Size(108, 30);
+            this.multithread.TabIndex = 108;
+            this.multithread.Text = "Multi Thread";
+            this.multithread.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(997, 587);
+            this.Controls.Add(this.multithread);
+            this.Controls.Add(this.compression_level);
+            this.Controls.Add(this.backup_type);
+            this.Controls.Add(this.materialLabel4);
+            this.Controls.Add(this.materialLabel3);
             this.Controls.Add(this.log);
             this.Controls.Add(this.materialRaisedButton4);
             this.Controls.Add(this.materialRaisedButton2);
@@ -464,6 +544,11 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn type;
         private System.Windows.Forms.DataGridViewTextBoxColumn date;
         private System.Windows.Forms.DataGridViewTextBoxColumn message;
+        private MaterialSkin.Controls.MaterialLabel materialLabel3;
+        private MaterialSkin.Controls.MaterialLabel materialLabel4;
+        private System.Windows.Forms.ComboBox backup_type;
+        private System.Windows.Forms.ComboBox compression_level;
+        private MaterialSkin.Controls.MaterialCheckBox multithread;
     }
 }
 
