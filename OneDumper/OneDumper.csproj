@@ -66,6 +66,9 @@
     <Reference Include="Octokit, Version=0.31.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Octokit.0.31.0\lib\net45\Octokit.dll</HintPath>
     </Reference>
+    <Reference Include="SecurityDriven.Inferno, Version=1.5.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Inferno.1.5.1\lib\net462\SecurityDriven.Inferno.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
