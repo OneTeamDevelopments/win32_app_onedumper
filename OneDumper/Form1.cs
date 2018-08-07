@@ -16,6 +16,7 @@ using System.Windows.Forms;
 using System.Text;
 using Kaitai;
 using System.Drawing;
+using System.Security.Cryptography;
 
 namespace OneDumper
 {
@@ -32,6 +33,21 @@ namespace OneDumper
             Threads = 0;
         bool Connected = true;
 
+        string ss,
+            h1 = "f7057d",
+            h2 = "49e39598",
+            h3 = "a3f686a",
+            h4 = "7c8e",
+            h5 = "68ebe1c",
+            h6 = "43d8ad",
+            h7 = "c9a42f63466",
+            h8 = "790cbf2e13",
+            h9 = "ec003",
+            h10 = "24eb5ec34",
+            h11 = "57d7a2",
+            h12 = "e497e3e",
+            h13 = "365c8aa05b";
+
         ListViewItem lastItemChecked;
         List<string> devices = new List<string>();
 
@@ -41,6 +57,7 @@ namespace OneDumper
         {
             Icon = Properties.Resources.onelabs;
             InitializeComponent();
+            ss = s(d(s(d(s(d(h1 + h2 + h3 + h4 + h5 + h6 + h7) + h8 + s(h9) + h10 + d(d(h11 + h12)) + h13)))));
             log.SelectionChanged += log_disableSelection;
             partList.SelectionChanged += parts_disableSelection;
             backup_type.SelectedIndex = 0;
@@ -48,6 +65,7 @@ namespace OneDumper
             detectThreadLimit();
             writeLog("Program Başlatıldı.", Default);
             getProgrammersAsync();
+
             reloadCOMPorts(null,null);
             COMPortReloader = new Timer();
             COMPortReloader.Tick += reloadCOMPorts;
@@ -62,6 +80,34 @@ namespace OneDumper
             programmerList.ItemCheck += programmerList_ItemCheck;
             programmerList.ItemChecked += programmerList_ItemCheckedAsync;
     }
+
+        static string s(string input)
+        {
+            MD5CryptoServiceProvider m = new MD5CryptoServiceProvider();
+            byte[] btr = Encoding.UTF8.GetBytes(input);
+            btr = m.ComputeHash(btr);
+            StringBuilder sb = new StringBuilder();
+            foreach (byte ba in btr)
+            {
+                sb.Append(ba.ToString("x2").ToLower());
+            }
+            return sb.ToString();
+        }
+
+        static string d(string input)
+        {
+            using (SHA1Managed sha1 = new SHA1Managed())
+            {
+                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
+                var sb = new StringBuilder(hash.Length * 2);
+
+                foreach (byte b in hash)
+                {
+                    sb.Append(b.ToString("X2"));
+                }
+                return sb.ToString();
+            }
+        }
 
         void detectThreadLimit()
         {
@@ -372,8 +418,7 @@ namespace OneDumper
                 {
                     joined += part.Value;
                 }
-                File.WriteAllBytes(tmpDir+"/joined.img", Encoding.Default.GetBytes(joined));
-
+                File.WriteAllBytes(tmpDir+"/joined.img", AES.Enc(Encoding.Default.GetBytes(joined),ss));
                 int level = 0;
                 if (compression_level.SelectedIndex == 0)
                 {
@@ -387,7 +432,8 @@ namespace OneDumper
                 {
                     level = 22;
                 }
-                await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f --rm -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
+                //await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f --rm -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
+                await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
                 if (!(new FileInfo(tmpDir+"/joined.comp")).Length.Equals(0))
                 {
                     writeLog("Yedekleme İşlemi Tamamlandı.", Success);
