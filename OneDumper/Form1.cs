@@ -14,9 +14,9 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Text;
-using Kaitai;
 using System.Drawing;
 using System.Security.Cryptography;
+using System.Xml;
 
 namespace OneDumper
 {
@@ -31,37 +31,24 @@ namespace OneDumper
             Success = 3,
             Warning = 4,
             Threads = 0;
-        bool Connected = true;
-
-        string ss,
-            h1 = "f7057d",
-            h2 = "49e39598",
-            h3 = "a3f686a",
-            h4 = "7c8e",
-            h5 = "68ebe1c",
-            h6 = "43d8ad",
-            h7 = "c9a42f63466",
-            h8 = "790cbf2e13",
-            h9 = "ec003",
-            h10 = "24eb5ec34",
-            h11 = "57d7a2",
-            h12 = "e497e3e",
-            h13 = "365c8aa05b";
+        bool Connected = false;
 
         ListViewItem lastItemChecked;
         List<string> devices = new List<string>();
 
         Timer COMPortReloader;
 
+        Dictionary<string, Dictionary<string, string>> partitions = new Dictionary<string, Dictionary<string, string>>();
+
         public Form1()
         {
             Icon = Properties.Resources.onelabs;
             InitializeComponent();
-            ss = s(d(s(d(s(d(h1 + h2 + h3 + h4 + h5 + h6 + h7) + h8 + s(h9) + h10 + d(d(h11 + h12)) + h13)))));
             log.SelectionChanged += log_disableSelection;
             partList.SelectionChanged += parts_disableSelection;
+            partList.ColumnHeaderMouseClick += parts_columnHeaderClick;
             backup_type.SelectedIndex = 0;
-            compression_level.SelectedIndex = 0;
+            data_type.SelectedIndex = 0;
             detectThreadLimit();
             writeLog("Program Başlatıldı.", Default);
             getProgrammersAsync();
@@ -154,21 +141,52 @@ namespace OneDumper
             return Convert.ToBase64String(Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><data>" + xml + "</data>"));
         }
 
-        public async Task<bool> backupPartitionAsync(string sector_size, string sector_offset, string filename, string label, string partition_sectors, string partition_number, string size_kb, string sparse, string start_byte, string start_sector)
+        public async Task<bool> backupPartitionAsync(string partition, string sector_size, string sector_offset, string filename, string label, string partition_sectors, string partition_number, string size_kb, string sparse, string start_byte, string start_sector)
         {
             bool error = false;
-            string xml = createXML("<read SECTOR_SIZE_IN_BYTES=\"" + sector_size + "\" file_sector_offset=\"" + sector_offset + "\" filename=\"" + filename + "\" label=\"" + label + "\" num_partition_sectors=\"" + partition_sectors + "\" physical_partition_number=\"" + partition_number + "\" size_in_KB=\"" + size_kb + "\" sparse=\"" + sparse + "\" start_byte_hex=\"" + start_byte + "\" start_sector=\"" + start_sector + "\"/>");
-            writeLog("Bölüm Yedekleniyor : "+label, Warning);
-            string output = await runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --rawxml=" + xml, tmpDir);
+
+            writeLog("Bölüm Yedekleniyor : " + label, Warning);
+
+            if (partition.Length >= 3 && partition.Substring(partition.Length - 3) == "bak")
+            {
+                writeLog("Bölüm Yedeklendi : " + label, Default);
+                return error;
+            }
+
+            if (partition == "userdata" && data_type.SelectedIndex == 1)
+            {
+                Directory.CreateDirectory(tmpDir + "/data");
+                runCommand(appPath + "/Library/make_ext4fs.exe", "-l " + (Int32.Parse(size_kb.Split('.')[0])*1000) + " -a data -s userdata.img data/", tmpDir, async delegate (object s, EventArgs a)
+                {
+                    Process p = (Process)s;
+                    string o = await p.StandardOutput.ReadToEndAsync();
+                    if (o.Contains("Created filesystem with"))
+                    {
+                        writeLog("Bölüm Yedeklendi : " + label, Default);
+                    }
+                    else
+                    {
+                        writeLog("Bölüm Yedeklenemedi : " + label, Error);
+                        error = true;
+                    }
+                });
+                Directory.Delete(tmpDir + "/data", true);
+            }
+            else
+            {
+                string xml = createXML("<read SECTOR_SIZE_IN_BYTES=\"" + sector_size + "\" file_sector_offset=\"" + sector_offset + "\" filename=\"" + filename + "\" label=\"" + label + "\" num_partition_sectors=\"" + partition_sectors + "\" physical_partition_number=\"" + partition_number + "\" size_in_KB=\"" + size_kb + "\" sparse=\"" + sparse + "\" start_byte_hex=\"" + start_byte + "\" start_sector=\"" + start_sector + "\"/>");
+                
+                string output = await runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --rawxml=" + xml, tmpDir);
                 if (output.Contains("All Finished Successfully"))
                 {
                     writeLog("Bölüm Yedeklendi : " + label, Default);
                 }
                 else
                 {
-                    writeLog("Bölüm Yedeklenemedi : "+label, Error);
+                    writeLog("Bölüm Yedeklenemedi : " + label, Error);
                     error = true;
                 }
+            }
             return error;
         }
 
@@ -272,94 +290,75 @@ namespace OneDumper
         }
         async Task readPartitionsAsync()
         {
-            List<Dictionary<string, string>> partitions = new List<Dictionary<string, string>> ();
-            byte[] gptFile = File.ReadAllBytes(tmpDir + "/gpt_main0.bin");
-            var gpt = new GptPartitionTable(new KaitaiStream(gptFile));
             System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
             customCulture.NumberFormat.NumberDecimalSeparator = ".";
             System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
-            bool backupGPT = false;
-            foreach (GptPartitionTable.PartitionEntry part in gpt.Primary.Entries)
+
+            string partitionXml = await runCommand(appPath + "/Library/gp1.exe", "gpt_main0.bin", tmpDir);
+            File.WriteAllText(tmpDir + "/partition.xml", partitionXml);
+            await runCommand(appPath + "/Library/gp2.exe", "-x partition.xml", tmpDir);
+
+            XmlDocument rawprogramXml = new XmlDocument();
+            rawprogramXml.PreserveWhitespace = true;
+            rawprogramXml.Load(tmpDir+"/rawprogram0.xml");
+            XmlNodeList programs = rawprogramXml.GetElementsByTagName("program");
+            File.Delete(tmpDir + "/rawprogram0.xml");
+
+            XmlDocument partXml = new XmlDocument();
+            partXml.PreserveWhitespace = true;
+            partXml.Load(tmpDir + "/partition.xml");
+            XmlNodeList parts = partXml.GetElementsByTagName("partition");
+
+            string userDataSize = null;
+
+            for (int i = 0; i < parts.Count; i++)
             {
-                var vars = new Dictionary<string, string>();
-                string label = new String(part.Name.Where(c => Char.IsLetterOrDigit(c)).ToArray()),
-                    filename = label + ".img",
-                    SECTOR_SIZE_IN_BYTES = part.M_Root.SectorSize.ToString(),
-                    start_sector = part.FirstLba.ToString(),
-                    end_sector = part.LastLba.ToString(),
-                    num_partition_sectors = (int.Parse(end_sector) - int.Parse(start_sector) + 1).ToString(),
-                    size_in_KB = (int.Parse(num_partition_sectors) / 2.0).ToString("0.0"),
-                    start_byte_hex = "0x"+(part.FirstLba * (ulong)part.M_Root.SectorSize).ToString("X");
-
-                if(string.IsNullOrEmpty(label.Trim()))
-                {
-                    /*
-                     * 
-                     * Primary Sector : 17408
-                     * Backup Sector : 16896
-                     * 
-                     */
-                    if (backupGPT)
-                    {
-                        label = "BackupGPT";
-                        filename = "gpt_backup0.bin";
-                        if (SECTOR_SIZE_IN_BYTES.Equals(4096))
-                        {
-                            start_sector = "NUM_DISK_SECTORS-5.";
-                            num_partition_sectors = "5";
-                        }
-                        else
-                        {
-                            start_sector = "NUM_DISK_SECTORS-33.";
-                            num_partition_sectors = "33";
-                        }
-                        start_byte_hex = "(" + SECTOR_SIZE_IN_BYTES+ "*NUM_DISK_SECTORS)-16896.";
-                    }
-                    else
-                    {
-                        label = "PrimaryGPT";
-                        filename = "gpt_main0.bin";
-                        start_sector = "0";
-                        if (SECTOR_SIZE_IN_BYTES.Equals(4096))
-                        {
-                            num_partition_sectors = "6";
-                        }
-                        else
-                        {
-                            num_partition_sectors = "34";
-                        }
-                        start_byte_hex = "0x0";
-
-                        backupGPT = true;
-                    }
-                    size_in_KB = (int.Parse(num_partition_sectors) / 2.0).ToString("0.0");
-                }
-                vars.Add("label", label);
-                vars.Add("filename", filename);
-                vars.Add("SECTOR_SIZE_IN_BYTES", SECTOR_SIZE_IN_BYTES);
-                vars.Add("start_sector", start_sector);
-                vars.Add("end_sector", end_sector);
-                vars.Add("num_partition_sectors", num_partition_sectors);
-                vars.Add("size_in_KB", size_in_KB);
-                vars.Add("start_byte_hex", start_byte_hex);
-                vars.Add("file_sector_offset", "0");
-                vars.Add("physical_partition_number", "0");
-                vars.Add("sparse", "false");
-                partitions.Add(vars);
+                if (parts[i].Attributes["label"].Value=="userdata") userDataSize = parts[i].Attributes["size_in_kb"].Value;
             }
 
-            File.Delete(tmpDir + "/gpt_main0.bin");
-            
-            if (partList.InvokeRequired)
+                for (int i = 0; i < programs.Count; i++)
+            {
+                var vars = new Dictionary<string, string>();
+                string SECTOR_SIZE_IN_BYTES = programs[i].Attributes["SECTOR_SIZE_IN_BYTES"].Value,
+                    file_sector_offset = programs[i].Attributes["file_sector_offset"].Value,
+                    label = programs[i].Attributes["label"].Value,
+                    filename = label + ".img",
+                    num_partition_sectors = programs[i].Attributes["num_partition_sectors"].Value,
+                    physical_partition_number = programs[i].Attributes["physical_partition_number"].Value,
+                    size_in_KB = (label=="userdata"? userDataSize:programs[i].Attributes["size_in_KB"].Value),
+                    sparse = programs[i].Attributes["sparse"].Value,
+                    start_byte_hex = programs[i].Attributes["start_byte_hex"].Value,
+                    start_sector = programs[i].Attributes["start_sector"].Value;
+
+                if (label == "PrimaryGPT") filename = "gpt_main0.bin";
+                else if (label == "BackupGPT") filename = "gpt_backup0.bin";
+
+                vars.Add("SECTOR_SIZE_IN_BYTES", SECTOR_SIZE_IN_BYTES);
+                vars.Add("file_sector_offset", file_sector_offset);
+                vars.Add("label", label);
+                vars.Add("filename", filename);
+                vars.Add("num_partition_sectors", num_partition_sectors);
+                vars.Add("physical_partition_number", physical_partition_number);
+                vars.Add("size_in_KB", size_in_KB);
+                vars.Add("sparse", sparse);
+                vars.Add("start_byte_hex", start_byte_hex);
+                vars.Add("start_sector", start_sector);
+                partitions.Add(label, vars);
+            }
+                if (partList.InvokeRequired)
             {
                 partList.Invoke(new MethodInvoker(delegate ()
                 {
                     partList.Rows.Clear();
                     partList.Refresh();
-                    partitions.ForEach(delegate (Dictionary<string, string> part)
+                    int i = 0;
+                    foreach (KeyValuePair<string, Dictionary<string, string>> entry in partitions)
                     {
-                        partList.Rows.Add(part["label"], GetBytesReadable(Convert.ToInt64(part["size_in_KB"].Split('.')[0])), false, part["SECTOR_SIZE_IN_BYTES"], part["file_sector_offset"], part["filename"], part["num_partition_sectors"], part["physical_partition_number"], part["size_in_KB"], part["sparse"], part["start_byte_hex"], part["start_sector"]);
-                    });
+                        Dictionary<string, string> part = entry.Value;
+                        partList.Rows.Add(part["label"], GetBytesReadable(Convert.ToInt64(part["size_in_KB"].Split('.')[0])), 1, part["SECTOR_SIZE_IN_BYTES"], part["file_sector_offset"], part["filename"], part["num_partition_sectors"], part["physical_partition_number"], part["size_in_KB"], part["sparse"], part["start_byte_hex"], part["start_sector"]);
+                        if(part["label"] == "PrimaryGPT" || part["label"] == "BackupGPT") partList.Rows[i].Visible = false;
+                        i++;
+                    }
                     partList.Sort(partList.Columns[0], ListSortDirection.Ascending);
                 }
                 ));
@@ -368,10 +367,14 @@ namespace OneDumper
             {
                 partList.Rows.Clear();
                 partList.Refresh();
-                partitions.ForEach(delegate (Dictionary<string, string> part)
+                int i = 0;
+                foreach (KeyValuePair<string, Dictionary<string, string>> entry in partitions)
                 {
-                    partList.Rows.Add(part["label"], GetBytesReadable(Convert.ToInt64(part["size_in_KB"].Split('.')[0])), false, part["SECTOR_SIZE_IN_BYTES"], part["file_sector_offset"], part["filename"], part["num_partition_sectors"], part["physical_partition_number"], part["size_in_KB"], part["sparse"], part["start_byte_hex"], part["start_sector"]);
-                });
+                    Dictionary<string, string> part = entry.Value;
+                    partList.Rows.Add(part["label"], GetBytesReadable(Convert.ToInt64(part["size_in_KB"].Split('.')[0])), 1, part["SECTOR_SIZE_IN_BYTES"], part["file_sector_offset"], part["filename"], part["num_partition_sectors"], part["physical_partition_number"], part["size_in_KB"], part["sparse"], part["start_byte_hex"], part["start_sector"]);
+                    if (part["label"] == "PrimaryGPT" || part["label"] == "BackupGPT") partList.Rows[i].Visible = false;
+                    i++;
+                }
                 partList.Sort(partList.Columns[0], ListSortDirection.Ascending);
             }
             if (materialRaisedButton1.InvokeRequired)
@@ -391,9 +394,10 @@ namespace OneDumper
 
         private async void materialRaisedButton1_ClickAsync(object sender, EventArgs e)
         {
+            if (Directory.Exists(appPath + "/Output")) Directory.Delete(appPath + "/Output",true);
+
             backup_type.Enabled = false;
-            compression_level.Enabled = false;
-            Dictionary<string, string> partitions = new Dictionary<string, string>();
+            data_type.Enabled = false;
             bool doAction = false,
                     error=false;
             foreach (DataGridViewRow row in partList.Rows)
@@ -402,49 +406,87 @@ namespace OneDumper
                 {
                     if (error) break;
                     if(!doAction) doAction = true;
-                    error=await backupPartitionAsync(row.Cells["sector_size"].Value.ToString(), row.Cells["sector_offset"].Value.ToString(), row.Cells["filename"].Value.ToString(), row.Cells["partition"].Value.ToString(), row.Cells["partition_sectors"].Value.ToString(), row.Cells["partition_number"].Value.ToString(), row.Cells["size_kb"].Value.ToString(), row.Cells["sparse"].Value.ToString(), row.Cells["start_byte"].Value.ToString(), row.Cells["start_sector"].Value.ToString());
-                    if (!error)
-                    {
-                        partitions.Add(row.Cells["partition"].Value.ToString(), File.ReadAllText(tmpDir + "/" + (row.Cells["filename"].Value.ToString()),Encoding.Default));
-                        File.Delete(tmpDir + "/" + (row.Cells["filename"].Value.ToString()));
-                    }
+                    error =await backupPartitionAsync(row.Cells["partition"].Value.ToString(), row.Cells["sector_size"].Value.ToString(), row.Cells["sector_offset"].Value.ToString(), row.Cells["filename"].Value.ToString(), row.Cells["partition"].Value.ToString(), row.Cells["partition_sectors"].Value.ToString(), row.Cells["partition_number"].Value.ToString(), row.Cells["size_kb"].Value.ToString(), row.Cells["sparse"].Value.ToString(), row.Cells["start_byte"].Value.ToString(), row.Cells["start_sector"].Value.ToString());
                 }
             }
-            if(doAction && !error)
+            if (doAction && !error)
             {
-                writeLog("İmajlar Sıkıştırılıyor.", Warning);
-                string joined = null;
-                foreach(KeyValuePair<string, string> part in partitions)
+                List<string> joined = new List<string>();
+
+                if (backup_type.SelectedIndex == 0)
                 {
-                    joined += part.Value;
-                }
-                File.WriteAllBytes(tmpDir+"/joined.img", AES.Enc(Encoding.Default.GetBytes(joined),ss));
-                int level = 0;
-                if (compression_level.SelectedIndex == 0)
-                {
-                    level = 17;
-                }
-                else if (compression_level.SelectedIndex == 1)
-                {
-                    level = 20;
-                }
-                else if (compression_level.SelectedIndex == 2)
-                {
-                    level = 22;
-                }
-                //await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f --rm -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
-                await runCommand(appPath + "/Library/Zstd.exe", "--ultra -f -" + level + (multithread.Checked ? " -T" + Threads : null) + " joined.img -o joined.comp", tmpDir);
-                if (!(new FileInfo(tmpDir+"/joined.comp")).Length.Equals(0))
-                {
-                    writeLog("Yedekleme İşlemi Tamamlandı.", Success);
+                    // QFIL
+                    File.Copy(appPath + "/" + programmerPrefix + "/" + programmerList.CheckedItems[0].Text, tmpDir + "/" + programmerList.CheckedItems[0].Text, true);
+
+                    List<string> rawProgramContent = new List<string>();
+                    rawProgramContent.Add("<?xml version=\"1.0\" ?>");
+                    rawProgramContent.Add("<data>");
+                    rawProgramContent.Add("  <!--NOTE: This is an ** Autogenerated file **-->");
+                    rawProgramContent.Add("  <!--NOTE: Copyright caneray@OneTeam (Used OneDumper)-->");
+
+                    foreach (DataGridViewRow row in partList.Rows)
+                    {
+                        var nm = row.Cells["partition"].Value.ToString();
+                        string filename = (nm.Length >= 3 && nm.Substring(nm.Length - 3) == "bak" ? nm.Substring(0, nm.Length - 3) : nm) + ".img";
+                        if (nm == "PrimaryGPT") filename = "gpt_main0.bin";
+                        else if (nm == "BackupGPT") filename = "gpt_backup0.bin";
+
+                        rawProgramContent.Add("  <program SECTOR_SIZE_IN_BYTES=\"" + row.Cells["sector_size"].Value.ToString() + "\" file_sector_offset=\"" + row.Cells["sector_offset"].Value.ToString() + "\" filename=\"" + (row.Cells["read"].Value.ToString().Equals("1") || row.Cells["partition"].Value.ToString() == "PrimaryGPT" || row.Cells["partition"].Value.ToString() == "BackupGPT"?filename:"") + "\" label=\"" + row.Cells["partition"].Value.ToString() + "\" num_partition_sectors=\"" + row.Cells["partition_sectors"].Value.ToString() + "\" physical_partition_number=\"" + row.Cells["partition_number"].Value.ToString() + "\" size_in_KB=\"" + (row.Cells["partition"].Value.ToString()=="userdata"?"0":row.Cells["size_kb"].Value.ToString()) + "\" sparse=\"" + row.Cells["sparse"].Value.ToString() + "\" start_byte_hex=\"" + row.Cells["start_byte"].Value.ToString() + "\" start_sector=\"" + row.Cells["start_sector"].Value.ToString() + "\"/>");
+                    }
+                    rawProgramContent.Add("</data>");
+                    File.WriteAllBytes(tmpDir + "/rawprogram0.xml", Encoding.Default.GetBytes(String.Join("\r\n", rawProgramContent.ToArray())));
                 }
                 else
                 {
-                    writeLog("Sıkıştırma İşlemi Başarısız. (Bellek Yetersiz)", Error);
+                    // FASTBOOT
+                    if (!Directory.Exists(tmpDir + "/FWImages")) Directory.CreateDirectory(tmpDir + "/FWImages");
+                    if (!Directory.Exists(appPath + "/Output/FWImages")) Directory.CreateDirectory(appPath + "/Output/FWImages");
+
+                    if (File.Exists(tmpDir + "/gpt_backup0.bin")) File.Delete(tmpDir+ "/gpt_backup0.bin");
+                    if (File.Exists(tmpDir + "/gpt_both0.bin")) File.Delete(tmpDir + "/gpt_both0.bin");
+                    if (File.Exists(tmpDir + "/gpt_main0.bin")) File.Delete(tmpDir + "/gpt_main0.bin");
+                    if (File.Exists(tmpDir + "/partition.xml")) File.Delete(tmpDir + "/partition.xml");
+                    if (File.Exists(tmpDir + "/patch0.xml")) File.Delete(tmpDir + "/patch0.xml");
+
+                    foreach (string newPath in Directory.GetFiles(tmpDir, "*.*")) File.Move(newPath, newPath.Replace(tmpDir, tmpDir + "/FWImages"));
+
+                    List<string> fbCommands = new List<string>();
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@shift /0");
+                    fbCommands.Add("@echo off&title Stock Rom Yukleyici - caneray@OneTeam&COLOR f0 & mode con cols=79 lines=29");
+                    fbCommands.Add("echo Rom Kurulumu Baslatiliyor...");
+                    fbCommands.Add("echo Userdata Siliniyor...");
+                    fbCommands.Add("fastboot erase userdata");
+                    fbCommands.Add("echo Userdata Silindi.");
+                    foreach (DataGridViewRow row in partList.Rows)
+                    {
+                        if (row.Cells["read"].Value.ToString().Equals("1"))
+                        {
+                            var nm = row.Cells["partition"].Value.ToString();
+                            string filename = (nm.Length >= 3 && nm.Substring(nm.Length - 3) == "bak" ? nm.Substring(0, nm.Length - 3) : nm) + ".img";
+
+                            fbCommands.Add("echo " + nm + " Flashlaniyor...");
+                            fbCommands.Add("fastboot flash " + nm + " FWImages/" + filename);
+                            fbCommands.Add("echo " + nm + " Flashlandi.");
+                        }
+                    }
+                    fbCommands.Add("fastboot reboot");
+                    fbCommands.Add("Rom Kurulumu Tamamlandi.");
+                    File.WriteAllBytes(tmpDir + "/Flashla.bat", Encoding.Default.GetBytes(String.Join("\r\n", fbCommands.ToArray())));
                 }
+
+                Directory.CreateDirectory(appPath + "/Output");
+                foreach (string newPath in Directory.GetFiles(tmpDir, "*.*",SearchOption.AllDirectories)) File.Move(newPath, newPath.Replace(tmpDir, appPath + "/Output"));
+                Process.Start(appPath + "/Output");
+
+                writeLog("Yedeleme İşlemi Tamamlandı.", Success);
                 backup_type.Enabled = true;
-                compression_level.Enabled = true;
-                
+                data_type.Enabled = true;
+
             }
             else if (doAction && error)
             {
@@ -461,7 +503,6 @@ namespace OneDumper
             writeLog("Bölümler Okunuyor...", Warning);
             runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --getgptmainbackup=gpt_both0.bin", tmpDir, async delegate (object s, EventArgs a)
               {
-                  File.Delete(tmpDir + "/gpt_backup0.bin");
                   Process p = (Process)s;
                   string o = await p.StandardOutput.ReadToEndAsync();
                   if (o.Contains("All Finished Successfully"))
@@ -515,7 +556,7 @@ namespace OneDumper
 
         private void materialRaisedButton4_ClickAsync(object sender, EventArgs e)
         {
-            if (!Directory.Exists(tmpDir)) Directory.CreateDirectory(tmpDir).Attributes = FileAttributes.Directory | FileAttributes.Hidden;
+            if (!Directory.Exists(tmpDir)) Directory.CreateDirectory(tmpDir);
 
             if (String.IsNullOrEmpty(deviceList.Text))
             {
@@ -642,6 +683,18 @@ namespace OneDumper
         private void parts_disableSelection(Object sender, EventArgs e)
         {
             partList.ClearSelection();
+        }
+
+        private void parts_columnHeaderClick(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if(e.ColumnIndex==2)
+            {
+                foreach (DataGridViewRow row in partList.Rows)
+                {
+                    DataGridViewCheckBoxCell chk = (DataGridViewCheckBoxCell)row.Cells[2];
+                    chk.Value = (chk.Value.ToString()=="1"?0:1);
+                }
+            }
         }
     }
 }
