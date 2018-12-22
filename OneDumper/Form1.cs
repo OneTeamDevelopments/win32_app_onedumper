@@ -17,6 +17,7 @@ using System.Text;
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Xml;
+using Kaitai;
 
 namespace OneDumper
 {
@@ -53,7 +54,7 @@ namespace OneDumper
             writeLog("Program Başlatıldı.", Default);
             getProgrammersAsync();
 
-            reloadCOMPorts(null,null);
+            reloadCOMPorts(null, null);
             COMPortReloader = new Timer();
             COMPortReloader.Tick += reloadCOMPorts;
             COMPortReloader.Interval = 800;
@@ -66,7 +67,7 @@ namespace OneDumper
 
             programmerList.ItemCheck += programmerList_ItemCheck;
             programmerList.ItemChecked += programmerList_ItemCheckedAsync;
-    }
+        }
 
         static string s(string input)
         {
@@ -103,8 +104,8 @@ namespace OneDumper
                 Threads += int.Parse(item["NumberOfCores"].ToString());
             }
         }
-        
-        async Task downloadFileAsync(string file,string output,bool call=false)
+
+        async Task downloadFileAsync(string file, string output, bool call = false)
         {
             if (!File.Exists(output))
             {
@@ -120,7 +121,7 @@ namespace OneDumper
                 writeLog(file + " Başarıyla İndirildi.", Success);
                 if (call) Process.Start(file);
             }
-            else if(call)
+            else if (call)
             {
                 Process.Start(file);
             }
@@ -156,7 +157,7 @@ namespace OneDumper
             if (partition == "userdata" && data_type.SelectedIndex == 1)
             {
                 Directory.CreateDirectory(tmpDir + "/data");
-                runCommand(appPath + "/Library/make_ext4fs.exe", "-l " + (Int32.Parse(size_kb.Split('.')[0])*1000) + " -a data -s userdata.img data/", tmpDir, async delegate (object s, EventArgs a)
+                runCommand(appPath + "/Library/make_ext4fs.exe", "-l " + (Int32.Parse(size_kb.Split('.')[0]) * 1000) + " -a data -s userdata.img data/", tmpDir, async delegate (object s, EventArgs a)
                 {
                     Process p = (Process)s;
                     string o = await p.StandardOutput.ReadToEndAsync();
@@ -175,7 +176,6 @@ namespace OneDumper
             else
             {
                 string xml = createXML("<read SECTOR_SIZE_IN_BYTES=\"" + sector_size + "\" file_sector_offset=\"" + sector_offset + "\" filename=\"" + filename + "\" label=\"" + label + "\" num_partition_sectors=\"" + partition_sectors + "\" physical_partition_number=\"" + partition_number + "\" size_in_KB=\"" + size_kb + "\" sparse=\"" + sparse + "\" start_byte_hex=\"" + start_byte + "\" start_sector=\"" + start_sector + "\"/>");
-                
                 string output = await runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --rawxml=" + xml, tmpDir);
                 if (output.Contains("All Finished Successfully"))
                 {
@@ -206,7 +206,7 @@ namespace OneDumper
                     if (s.Contains("QDLoader 9008")) tmpDevices.Add(s);
                 }
             }
-            if(devices.Count!=tmpDevices.Count)
+            if (devices.Count != tmpDevices.Count)
             {
                 deviceList.DataSource = null;
                 deviceList.Items.Clear();
@@ -222,7 +222,8 @@ namespace OneDumper
                 {
                     deviceList.Text = null;
                 }
-            }        }
+            }
+        }
 
         async Task getProgrammersAsync()
         {
@@ -233,7 +234,7 @@ namespace OneDumper
                 .Content.GetAllContents("OneLabsTools", "Programmers");
 
             IReadOnlyList<RepositoryContent> files = response;
-            
+
             if (Directory.Exists("CustomProgrammers"))
             {
                 foreach (string file in Directory.GetFiles("CustomProgrammers", "*.*").Where(s => s.EndsWith(".mbn") || s.EndsWith(".elf") || s.EndsWith(".bin")).Select(p => Path.GetFileName(p)).ToArray())
@@ -244,7 +245,7 @@ namespace OneDumper
 
             foreach (RepositoryContent file in files)
             {
-                if(!file.Name.Contains("QCOM_USB_Driver")) programmers.Add(new ListViewItem(file.Name,programmerList.Groups[1]));
+                if (!file.Name.Contains("QCOM_USB_Driver")) programmers.Add(new ListViewItem(file.Name, programmerList.Groups[1]));
             }
 
             programmerList.BeginUpdate();
@@ -259,7 +260,7 @@ namespace OneDumper
             {
                 foreach (DataGridViewRow item in log.Rows)
                 {
-                    string info=null;
+                    string info = null;
                     int type = (int)item.Cells[1].Value;
                     if (type == Success)
                     {
@@ -277,7 +278,7 @@ namespace OneDumper
                     {
                         info = "Bilgi";
                     }
-                    tw.WriteLine(item.Cells[2].Value+" : ("+info+") "+item.Cells[3].Value);
+                    tw.WriteLine(item.Cells[2].Value + " : (" + info + ") " + item.Cells[3].Value);
                 }
             }
             writeLog("Log Kaydedildi : log.txt", Success);
@@ -285,14 +286,13 @@ namespace OneDumper
 
         private async void materialRaisedButton2_ClickAsync(object sender, EventArgs e)
         {
-            string targetOS = (Environment.Is64BitOperatingSystem ? "_x64" : "_x86");
-            await downloadFileAsync("QCOM_USB_Driver" + targetOS + ".exe", "QCOM_USB_Driver" + targetOS + ".exe", true);
+            await downloadFileAsync("QCOM_USB_Driver.exe", "QCOM_USB_Driver.exe", true);
         }
         async Task readPartitionsAsync()
         {
-            System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
-            customCulture.NumberFormat.NumberDecimalSeparator = ".";
-            System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
+
+            byte[] gptFile = File.ReadAllBytes(tmpDir + "/gpt_main0.bin");
+            var gpt = new GptPartitionTable(new KaitaiStream(gptFile));
 
             string partitionXml = await runCommand(appPath + "/Library/gp1.exe", "gpt_main0.bin", tmpDir);
             File.WriteAllText(tmpDir + "/partition.xml", partitionXml);
@@ -300,7 +300,7 @@ namespace OneDumper
 
             XmlDocument rawprogramXml = new XmlDocument();
             rawprogramXml.PreserveWhitespace = true;
-            rawprogramXml.Load(tmpDir+"/rawprogram0.xml");
+            rawprogramXml.Load(tmpDir + "/rawprogram0.xml");
             XmlNodeList programs = rawprogramXml.GetElementsByTagName("program");
             File.Delete(tmpDir + "/rawprogram0.xml");
 
@@ -309,14 +309,19 @@ namespace OneDumper
             partXml.Load(tmpDir + "/partition.xml");
             XmlNodeList parts = partXml.GetElementsByTagName("partition");
 
+
+            System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
+            customCulture.NumberFormat.NumberDecimalSeparator = ".";
+            System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
+
             string userDataSize = null;
 
             for (int i = 0; i < parts.Count; i++)
             {
-                if (parts[i].Attributes["label"].Value=="userdata") userDataSize = parts[i].Attributes["size_in_kb"].Value;
+                if (parts[i].Attributes["label"].Value == "userdata") userDataSize = parts[i].Attributes["size_in_kb"].Value;
             }
 
-                for (int i = 0; i < programs.Count; i++)
+            for (int i = 0; i < programs.Count; i++)
             {
                 var vars = new Dictionary<string, string>();
                 string SECTOR_SIZE_IN_BYTES = programs[i].Attributes["SECTOR_SIZE_IN_BYTES"].Value,
@@ -325,10 +330,21 @@ namespace OneDumper
                     filename = label + ".img",
                     num_partition_sectors = programs[i].Attributes["num_partition_sectors"].Value,
                     physical_partition_number = programs[i].Attributes["physical_partition_number"].Value,
-                    size_in_KB = (label=="userdata"? userDataSize:programs[i].Attributes["size_in_KB"].Value),
+                    size_in_KB = (label == "userdata" ? userDataSize : programs[i].Attributes["size_in_KB"].Value),
                     sparse = programs[i].Attributes["sparse"].Value,
-                    start_byte_hex = programs[i].Attributes["start_byte_hex"].Value,
+                    start_byte_hex = "0x"+programs[i].Attributes["start_byte_hex"].Value.Substring(2).ToUpper(),
                     start_sector = programs[i].Attributes["start_sector"].Value;
+                
+                
+                foreach (GptPartitionTable.PartitionEntry part in gpt.Primary.Entries)
+                {
+                    if(new String(part.Name.Where(c => Char.IsLetterOrDigit(c)).ToArray())==label)
+                    {
+                        start_sector = part.FirstLba.ToString();
+                        start_byte_hex = "0x" + (part.FirstLba * (ulong)part.M_Root.SectorSize).ToString("X");
+                        break;
+                    }
+                }
 
                 if (label == "PrimaryGPT") filename = "gpt_main0.bin";
                 else if (label == "BackupGPT") filename = "gpt_backup0.bin";
@@ -345,7 +361,7 @@ namespace OneDumper
                 vars.Add("start_sector", start_sector);
                 partitions.Add(label, vars);
             }
-                if (partList.InvokeRequired)
+            if (partList.InvokeRequired)
             {
                 partList.Invoke(new MethodInvoker(delegate ()
                 {
@@ -356,7 +372,7 @@ namespace OneDumper
                     {
                         Dictionary<string, string> part = entry.Value;
                         partList.Rows.Add(part["label"], GetBytesReadable(Convert.ToInt64(part["size_in_KB"].Split('.')[0])), 1, part["SECTOR_SIZE_IN_BYTES"], part["file_sector_offset"], part["filename"], part["num_partition_sectors"], part["physical_partition_number"], part["size_in_KB"], part["sparse"], part["start_byte_hex"], part["start_sector"]);
-                        if(part["label"] == "PrimaryGPT" || part["label"] == "BackupGPT") partList.Rows[i].Visible = false;
+                        if (part["label"] == "PrimaryGPT" || part["label"] == "BackupGPT") partList.Rows[i].Visible = false;
                         i++;
                     }
                     partList.Sort(partList.Columns[0], ListSortDirection.Ascending);
@@ -394,19 +410,19 @@ namespace OneDumper
 
         private async void materialRaisedButton1_ClickAsync(object sender, EventArgs e)
         {
-            if (Directory.Exists(appPath + "/Output")) Directory.Delete(appPath + "/Output",true);
+            if (Directory.Exists(appPath + "/Output")) Directory.Delete(appPath + "/Output", true);
 
             backup_type.Enabled = false;
             data_type.Enabled = false;
             bool doAction = false,
-                    error=false;
+                    error = false;
             foreach (DataGridViewRow row in partList.Rows)
             {
                 if (row.Cells["read"].Value.ToString().Equals("1"))
                 {
                     if (error) break;
-                    if(!doAction) doAction = true;
-                    error =await backupPartitionAsync(row.Cells["partition"].Value.ToString(), row.Cells["sector_size"].Value.ToString(), row.Cells["sector_offset"].Value.ToString(), row.Cells["filename"].Value.ToString(), row.Cells["partition"].Value.ToString(), row.Cells["partition_sectors"].Value.ToString(), row.Cells["partition_number"].Value.ToString(), row.Cells["size_kb"].Value.ToString(), row.Cells["sparse"].Value.ToString(), row.Cells["start_byte"].Value.ToString(), row.Cells["start_sector"].Value.ToString());
+                    if (!doAction) doAction = true;
+                    error = await backupPartitionAsync(row.Cells["partition"].Value.ToString(), row.Cells["sector_size"].Value.ToString(), row.Cells["sector_offset"].Value.ToString(), row.Cells["filename"].Value.ToString(), row.Cells["partition"].Value.ToString(), row.Cells["partition_sectors"].Value.ToString(), row.Cells["partition_number"].Value.ToString(), row.Cells["size_kb"].Value.ToString(), row.Cells["sparse"].Value.ToString(), row.Cells["start_byte"].Value.ToString(), row.Cells["start_sector"].Value.ToString());
                 }
             }
             if (doAction && !error)
@@ -431,7 +447,7 @@ namespace OneDumper
                         if (nm == "PrimaryGPT") filename = "gpt_main0.bin";
                         else if (nm == "BackupGPT") filename = "gpt_backup0.bin";
 
-                        rawProgramContent.Add("  <program SECTOR_SIZE_IN_BYTES=\"" + row.Cells["sector_size"].Value.ToString() + "\" file_sector_offset=\"" + row.Cells["sector_offset"].Value.ToString() + "\" filename=\"" + (row.Cells["read"].Value.ToString().Equals("1") || row.Cells["partition"].Value.ToString() == "PrimaryGPT" || row.Cells["partition"].Value.ToString() == "BackupGPT"?filename:"") + "\" label=\"" + row.Cells["partition"].Value.ToString() + "\" num_partition_sectors=\"" + row.Cells["partition_sectors"].Value.ToString() + "\" physical_partition_number=\"" + row.Cells["partition_number"].Value.ToString() + "\" size_in_KB=\"" + (row.Cells["partition"].Value.ToString()=="userdata"?"0":row.Cells["size_kb"].Value.ToString()) + "\" sparse=\"" + row.Cells["sparse"].Value.ToString() + "\" start_byte_hex=\"" + row.Cells["start_byte"].Value.ToString() + "\" start_sector=\"" + row.Cells["start_sector"].Value.ToString() + "\"/>");
+                        rawProgramContent.Add("  <program SECTOR_SIZE_IN_BYTES=\"" + row.Cells["sector_size"].Value.ToString() + "\" file_sector_offset=\"" + row.Cells["sector_offset"].Value.ToString() + "\" filename=\"" + (row.Cells["read"].Value.ToString().Equals("1") || row.Cells["partition"].Value.ToString() == "PrimaryGPT" || row.Cells["partition"].Value.ToString() == "BackupGPT" ? filename : "") + "\" label=\"" + row.Cells["partition"].Value.ToString() + "\" num_partition_sectors=\"" + row.Cells["partition_sectors"].Value.ToString() + "\" physical_partition_number=\"" + row.Cells["partition_number"].Value.ToString() + "\" size_in_KB=\"" + (row.Cells["partition"].Value.ToString() == "userdata" ? "0" : row.Cells["size_kb"].Value.ToString()) + "\" sparse=\"" + row.Cells["sparse"].Value.ToString() + "\" start_byte_hex=\"" + row.Cells["start_byte"].Value.ToString() + "\" start_sector=\"" + row.Cells["start_sector"].Value.ToString() + "\"/>");
                     }
                     rawProgramContent.Add("</data>");
                     File.WriteAllBytes(tmpDir + "/rawprogram0.xml", Encoding.Default.GetBytes(String.Join("\r\n", rawProgramContent.ToArray())));
@@ -442,7 +458,7 @@ namespace OneDumper
                     if (!Directory.Exists(tmpDir + "/FWImages")) Directory.CreateDirectory(tmpDir + "/FWImages");
                     if (!Directory.Exists(appPath + "/Output/FWImages")) Directory.CreateDirectory(appPath + "/Output/FWImages");
 
-                    if (File.Exists(tmpDir + "/gpt_backup0.bin")) File.Delete(tmpDir+ "/gpt_backup0.bin");
+                    if (File.Exists(tmpDir + "/gpt_backup0.bin")) File.Delete(tmpDir + "/gpt_backup0.bin");
                     if (File.Exists(tmpDir + "/gpt_both0.bin")) File.Delete(tmpDir + "/gpt_both0.bin");
                     if (File.Exists(tmpDir + "/gpt_main0.bin")) File.Delete(tmpDir + "/gpt_main0.bin");
                     if (File.Exists(tmpDir + "/partition.xml")) File.Delete(tmpDir + "/partition.xml");
@@ -480,7 +496,7 @@ namespace OneDumper
                 }
 
                 Directory.CreateDirectory(appPath + "/Output");
-                foreach (string newPath in Directory.GetFiles(tmpDir, "*.*",SearchOption.AllDirectories)) File.Move(newPath, newPath.Replace(tmpDir, appPath + "/Output"));
+                foreach (string newPath in Directory.GetFiles(tmpDir, "*.*", SearchOption.AllDirectories)) File.Move(newPath, newPath.Replace(tmpDir, appPath + "/Output"));
                 Process.Start(appPath + "/Output");
 
                 writeLog("Yedeleme İşlemi Tamamlandı.", Success);
@@ -502,26 +518,27 @@ namespace OneDumper
         {
             writeLog("Bölümler Okunuyor...", Warning);
             runCommand(appPath + "/Library/OneLoader.exe", "--port=\\\\.\\" + comPort + " --getgptmainbackup=gpt_both0.bin", tmpDir, async delegate (object s, EventArgs a)
-              {
-                  Process p = (Process)s;
-                  string o = await p.StandardOutput.ReadToEndAsync();
-                  if (o.Contains("All Finished Successfully"))
-                  {
-                      await readPartitionsAsync();
-                  }
-                  else
-                  {
-                      writeLog("Bölümler Okunamadı.", Error);
-                  }
-              });
+            {
+                Process p = (Process)s;
+                string o = await p.StandardOutput.ReadToEndAsync();
+                if (o.Contains("All Finished Successfully"))
+                {
+                    await readPartitionsAsync();
+                }
+                else
+                {
+                    writeLog("Bölümler Okunamadı.", Error);
+                }
+            });
         }
-        void runCommand(string command,string args, string path, EventHandler e)
+        void runCommand(string command, string args, string path, EventHandler e)
         {
             Process process = new Process
             {
-                StartInfo = new ProcessStartInfo {
-                    FileName =command,
-                    Arguments= args,
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = command,
+                    Arguments = args,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WorkingDirectory = path,
@@ -588,25 +605,25 @@ namespace OneDumper
                 writeLog("Sahara Protokolü Başlatılıyor : " + selectedProgrammer, Warning);
 
                 runCommand("Library/QSaharaServer.exe", "-p \\\\.\\" + comPort + " -s 13:" + programmerPrefix + "/" + selectedProgrammer, appPath, delegate (object s, EventArgs a)
+                {
+                    Process p = (Process)s;
+                    if (p.StandardOutput.ReadToEnd().Contains("Sahara protocol completed"))
                     {
-                        Process p = (Process)s;
-                        if (p.StandardOutput.ReadToEnd().Contains("Sahara protocol completed"))
-                        {
-                            writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
-                            materialRaisedButton1.Enabled = true;
-                            getGPTAsync();
-                        }
-                        else
-                        {
-                            writeLog("Programmer Hatalı, Cihazı Yeniden EDL Moduna Alınız.", Error);
-                            COMPortReloader.Enabled = true;
-                            COMPortReloader.Start();
-                            deviceList.Enabled = true;
-                            programmerList.Enabled = true;
-                            materialRaisedButton4.Enabled = true;
-                            materialRaisedButton1.Enabled = false;
-                        }
-                    });
+                        writeLog("Cihaz İle Bağlantı Kuruldu.", Success);
+                        materialRaisedButton1.Enabled = true;
+                        getGPTAsync();
+                    }
+                    else
+                    {
+                        writeLog("Programmer Hatalı, Cihazı Yeniden EDL Moduna Alınız.", Error);
+                        COMPortReloader.Enabled = true;
+                        COMPortReloader.Start();
+                        deviceList.Enabled = true;
+                        programmerList.Enabled = true;
+                        materialRaisedButton4.Enabled = true;
+                        materialRaisedButton1.Enabled = false;
+                    }
+                });
             }
             else
             {
@@ -687,14 +704,15 @@ namespace OneDumper
 
         private void parts_columnHeaderClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            if(e.ColumnIndex==2)
+            if (e.ColumnIndex == 2)
             {
                 foreach (DataGridViewRow row in partList.Rows)
                 {
                     DataGridViewCheckBoxCell chk = (DataGridViewCheckBoxCell)row.Cells[2];
-                    chk.Value = (chk.Value.ToString()=="1"?0:1);
+                    chk.Value = (chk.Value.ToString() == "1" ? 0 : 1);
                 }
             }
         }
     }
 }
+ 
