@@ -17,7 +17,7 @@ using System.Text;
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Xml;
-using Kaitai;
+using System.Text.RegularExpressions;
 
 namespace OneDumper
 {
@@ -157,7 +157,7 @@ namespace OneDumper
             if (partition == "userdata" && data_type.SelectedIndex == 1)
             {
                 Directory.CreateDirectory(tmpDir + "/data");
-                runCommand(appPath + "/Library/make_ext4fs.exe", "-l " + (Int32.Parse(size_kb.Split('.')[0]) * 1000) + " -a data -s userdata.img data/", tmpDir, async delegate (object s, EventArgs a)
+                runCommand(appPath + "/Library/make_ext4fs.exe", "-l " + (Int64.Parse(size_kb.Split('.')[0]) * 1000) + " -a data -s userdata.img data/", tmpDir, async delegate (object s, EventArgs a)
                 {
                     Process p = (Process)s;
                     string o = await p.StandardOutput.ReadToEndAsync();
@@ -290,10 +290,6 @@ namespace OneDumper
         }
         async Task readPartitionsAsync()
         {
-
-            byte[] gptFile = File.ReadAllBytes(tmpDir + "/gpt_main0.bin");
-            var gpt = new GptPartitionTable(new KaitaiStream(gptFile));
-
             string partitionXml = await runCommand(appPath + "/Library/gp1.exe", "gpt_main0.bin", tmpDir);
             File.WriteAllText(tmpDir + "/partition.xml", partitionXml);
             await runCommand(appPath + "/Library/gp2.exe", "-x partition.xml", tmpDir);
@@ -308,7 +304,6 @@ namespace OneDumper
             partXml.PreserveWhitespace = true;
             partXml.Load(tmpDir + "/partition.xml");
             XmlNodeList parts = partXml.GetElementsByTagName("partition");
-
 
             System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
             customCulture.NumberFormat.NumberDecimalSeparator = ".";
@@ -332,18 +327,16 @@ namespace OneDumper
                     physical_partition_number = programs[i].Attributes["physical_partition_number"].Value,
                     size_in_KB = (label == "userdata" ? userDataSize : programs[i].Attributes["size_in_KB"].Value),
                     sparse = programs[i].Attributes["sparse"].Value,
-                    start_byte_hex = "0x"+programs[i].Attributes["start_byte_hex"].Value.Substring(2).ToUpper(),
+                    start_byte_hex = "0x" + programs[i].Attributes["start_byte_hex"].Value.Substring(2).ToUpper(),
                     start_sector = programs[i].Attributes["start_sector"].Value;
-                
-                
-                foreach (GptPartitionTable.PartitionEntry part in gpt.Primary.Entries)
+
+                if (label != "PrimaryGPT" && label != "BackupGPT")
                 {
-                    if(new String(part.Name.Where(c => Char.IsLetterOrDigit(c)).ToArray())==label)
-                    {
-                        start_sector = part.FirstLba.ToString();
-                        start_byte_hex = "0x" + (part.FirstLba * (ulong)part.M_Root.SectorSize).ToString("X");
-                        break;
-                    }
+                    string[] LBAS = partitionXml.Split(new string[] { "<partition label=\"" + label + "\"" }, StringSplitOptions.None)[0].Split(new string[] { "<!-- First LBA: " }, StringSplitOptions.None);
+                    string fLBA = LBAS[LBAS.Count() - 1].Split(new string[] { " / " }, StringSplitOptions.None)[0];
+
+                    start_byte_hex = "0x" + (Int64.Parse(fLBA) * Int64.Parse(SECTOR_SIZE_IN_BYTES)).ToString("X").ToUpper();
+                    start_sector = fLBA;
                 }
 
                 if (label == "PrimaryGPT") filename = "gpt_main0.bin";
