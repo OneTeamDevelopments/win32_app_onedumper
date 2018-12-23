@@ -17,7 +17,7 @@ using System.Text;
 using System.Drawing;
 using System.Security.Cryptography;
 using System.Xml;
-using System.Text.RegularExpressions;
+using System.Net;
 
 namespace OneDumper
 {
@@ -50,6 +50,7 @@ namespace OneDumper
             partList.ColumnHeaderMouseClick += parts_columnHeaderClick;
             backup_type.SelectedIndex = 0;
             data_type.SelectedIndex = 0;
+            if (!Directory.Exists(appPath + "/CustomProgrammers")) Directory.CreateDirectory(appPath + "/CustomProgrammers");
             detectThreadLimit();
             writeLog("Program Başlatıldı.", Default);
             getProgrammersAsync();
@@ -67,6 +68,22 @@ namespace OneDumper
 
             programmerList.ItemCheck += programmerList_ItemCheck;
             programmerList.ItemChecked += programmerList_ItemCheckedAsync;
+        }
+
+        public static bool checkNetwork()
+        {
+            try
+            {
+                using (var client = new WebClient())
+                using (client.OpenRead("http://clients3.google.com/generate_204"))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         static string s(string input)
@@ -229,11 +246,19 @@ namespace OneDumper
         {
             List<ListViewItem> programmers = new List<ListViewItem>();
 
-            var response = await new GitHubClient(new ProductHeaderValue("OneDumper"))
-                .Repository
-                .Content.GetAllContents("OneLabsTools", "Programmers");
+            if (checkNetwork())
+            {
+                var response = await new GitHubClient(new ProductHeaderValue("OneDumper"))
+                    .Repository
+                    .Content.GetAllContents("OneLabsTools", "Programmers");
 
-            IReadOnlyList<RepositoryContent> files = response;
+                IReadOnlyList<RepositoryContent> files = response;
+
+                foreach (RepositoryContent file in files)
+                {
+                    if (!file.Name.Contains("QCOM_USB_Driver")) programmers.Add(new ListViewItem(file.Name, programmerList.Groups[1]));
+                }
+            }
 
             if (Directory.Exists("CustomProgrammers"))
             {
@@ -241,11 +266,6 @@ namespace OneDumper
                 {
                     programmers.Add(new ListViewItem(file, programmerList.Groups[0]));
                 }
-            }
-
-            foreach (RepositoryContent file in files)
-            {
-                if (!file.Name.Contains("QCOM_USB_Driver")) programmers.Add(new ListViewItem(file.Name, programmerList.Groups[1]));
             }
 
             programmerList.BeginUpdate();
@@ -492,14 +512,14 @@ namespace OneDumper
                 foreach (string newPath in Directory.GetFiles(tmpDir, "*.*", SearchOption.AllDirectories)) File.Move(newPath, newPath.Replace(tmpDir, appPath + "/Output"));
                 Process.Start(appPath + "/Output");
 
-                writeLog("Yedeleme İşlemi Tamamlandı.", Success);
+                writeLog("Yedekleme İşlemi Tamamlandı.", Success);
                 backup_type.Enabled = true;
                 data_type.Enabled = true;
 
             }
             else if (doAction && error)
             {
-                writeLog("Yedeklme İşlemi Başarısız.", Error);
+                writeLog("Yedekleme İşlemi Başarısız.", Error);
             }
             else if (!doAction)
             {

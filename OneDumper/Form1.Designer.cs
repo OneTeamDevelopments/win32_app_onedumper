@@ -31,6 +31,18 @@
             System.Windows.Forms.ListViewGroup listViewGroup3 = new System.Windows.Forms.ListViewGroup("Yerel", System.Windows.Forms.HorizontalAlignment.Left);
             System.Windows.Forms.ListViewGroup listViewGroup4 = new System.Windows.Forms.ListViewGroup("Uzak", System.Windows.Forms.HorizontalAlignment.Left);
             this.partList = new System.Windows.Forms.DataGridView();
+            this.partition = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.size = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.read = new System.Windows.Forms.DataGridViewCheckBoxColumn();
+            this.sector_size = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.sector_offset = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.filename = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.partition_sectors = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.partition_number = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.size_kb = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.sparse = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.start_byte = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.start_sector = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.materialRaisedButton1 = new MaterialSkin.Controls.MaterialRaisedButton();
             this.materialLabel1 = new MaterialSkin.Controls.MaterialLabel();
             this.materialLabel2 = new MaterialSkin.Controls.MaterialLabel();
@@ -53,18 +65,6 @@
             this.backup_type = new System.Windows.Forms.ComboBox();
             this.data_type = new System.Windows.Forms.ComboBox();
             this.materialLabel4 = new MaterialSkin.Controls.MaterialLabel();
-            this.partition = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.size = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.read = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.sector_size = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.sector_offset = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.filename = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.partition_sectors = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.partition_number = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.size_kb = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.sparse = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.start_byte = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.start_sector = new System.Windows.Forms.DataGridViewTextBoxColumn();
             ((System.ComponentModel.ISupportInitialize)(this.partList)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.log)).BeginInit();
             this.SuspendLayout();
@@ -99,6 +99,86 @@
             this.partList.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.partList.Size = new System.Drawing.Size(636, 371);
             this.partList.TabIndex = 0;
+            // 
+            // partition
+            // 
+            this.partition.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
+            this.partition.HeaderText = "Bölüm";
+            this.partition.Name = "partition";
+            this.partition.ReadOnly = true;
+            this.partition.Resizable = System.Windows.Forms.DataGridViewTriState.False;
+            // 
+            // size
+            // 
+            this.size.FillWeight = 150F;
+            this.size.HeaderText = "Bölüm Boyutu";
+            this.size.Name = "size";
+            this.size.ReadOnly = true;
+            this.size.Resizable = System.Windows.Forms.DataGridViewTriState.False;
+            this.size.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            // 
+            // read
+            // 
+            this.read.FalseValue = "0";
+            this.read.HeaderText = "Oku";
+            this.read.Name = "read";
+            this.read.Resizable = System.Windows.Forms.DataGridViewTriState.False;
+            this.read.TrueValue = "1";
+            this.read.Width = 50;
+            // 
+            // sector_size
+            // 
+            this.sector_size.HeaderText = "sector_size";
+            this.sector_size.Name = "sector_size";
+            this.sector_size.Visible = false;
+            // 
+            // sector_offset
+            // 
+            this.sector_offset.HeaderText = "sector_offset";
+            this.sector_offset.Name = "sector_offset";
+            this.sector_offset.Visible = false;
+            // 
+            // filename
+            // 
+            this.filename.HeaderText = "filename";
+            this.filename.Name = "filename";
+            this.filename.Visible = false;
+            // 
+            // partition_sectors
+            // 
+            this.partition_sectors.HeaderText = "partition_sectors";
+            this.partition_sectors.Name = "partition_sectors";
+            this.partition_sectors.Visible = false;
+            // 
+            // partition_number
+            // 
+            this.partition_number.HeaderText = "partition_number";
+            this.partition_number.Name = "partition_number";
+            this.partition_number.Visible = false;
+            // 
+            // size_kb
+            // 
+            this.size_kb.HeaderText = "size_kb";
+            this.size_kb.Name = "size_kb";
+            this.size_kb.Visible = false;
+            // 
+            // sparse
+            // 
+            this.sparse.HeaderText = "sparse";
+            this.sparse.Name = "sparse";
+            this.sparse.Visible = false;
+            // 
+            // start_byte
+            // 
+            this.start_byte.HeaderText = "start_byte";
+            this.start_byte.Name = "start_byte";
+            this.start_byte.Visible = false;
+            // 
+            // start_sector
+            // 
+            this.start_sector.HeaderText = "start_sector";
+            this.start_sector.Name = "start_sector";
+            this.start_sector.Visible = false;
             // 
             // materialRaisedButton1
             // 
@@ -354,7 +434,7 @@
             this.data_type.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.data_type.FormattingEnabled = true;
             this.data_type.Items.AddRange(new object[] {
-            "Orjinal Userdata Kullan",
+            "Orijinal Userdata Kullan",
             "Dummy Userdata Kullan"});
             this.data_type.Location = new System.Drawing.Point(16, 426);
             this.data_type.Name = "data_type";
@@ -370,89 +450,9 @@
             this.materialLabel4.Location = new System.Drawing.Point(16, 399);
             this.materialLabel4.MouseState = MaterialSkin.MouseState.HOVER;
             this.materialLabel4.Name = "materialLabel4";
-            this.materialLabel4.Size = new System.Drawing.Size(114, 19);
+            this.materialLabel4.Size = new System.Drawing.Size(110, 19);
             this.materialLabel4.TabIndex = 107;
-            this.materialLabel4.Text = "Data Yedek Tipi";
-            // 
-            // partition
-            // 
-            this.partition.AutoSizeMode = System.Windows.Forms.DataGridViewAutoSizeColumnMode.Fill;
-            this.partition.HeaderText = "Bölüm";
-            this.partition.Name = "partition";
-            this.partition.ReadOnly = true;
-            this.partition.Resizable = System.Windows.Forms.DataGridViewTriState.False;
-            // 
-            // size
-            // 
-            this.size.FillWeight = 150F;
-            this.size.HeaderText = "Bölüm Boyutu";
-            this.size.Name = "size";
-            this.size.ReadOnly = true;
-            this.size.Resizable = System.Windows.Forms.DataGridViewTriState.False;
-            this.size.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
-            // 
-            // read
-            // 
-            this.read.FalseValue = "0";
-            this.read.HeaderText = "Oku";
-            this.read.Name = "read";
-            this.read.Resizable = System.Windows.Forms.DataGridViewTriState.False;
-            this.read.TrueValue = "1";
-            this.read.Width = 50;
-            // 
-            // sector_size
-            // 
-            this.sector_size.HeaderText = "sector_size";
-            this.sector_size.Name = "sector_size";
-            this.sector_size.Visible = false;
-            // 
-            // sector_offset
-            // 
-            this.sector_offset.HeaderText = "sector_offset";
-            this.sector_offset.Name = "sector_offset";
-            this.sector_offset.Visible = false;
-            // 
-            // filename
-            // 
-            this.filename.HeaderText = "filename";
-            this.filename.Name = "filename";
-            this.filename.Visible = false;
-            // 
-            // partition_sectors
-            // 
-            this.partition_sectors.HeaderText = "partition_sectors";
-            this.partition_sectors.Name = "partition_sectors";
-            this.partition_sectors.Visible = false;
-            // 
-            // partition_number
-            // 
-            this.partition_number.HeaderText = "partition_number";
-            this.partition_number.Name = "partition_number";
-            this.partition_number.Visible = false;
-            // 
-            // size_kb
-            // 
-            this.size_kb.HeaderText = "size_kb";
-            this.size_kb.Name = "size_kb";
-            this.size_kb.Visible = false;
-            // 
-            // sparse
-            // 
-            this.sparse.HeaderText = "sparse";
-            this.sparse.Name = "sparse";
-            this.sparse.Visible = false;
-            // 
-            // start_byte
-            // 
-            this.start_byte.HeaderText = "start_byte";
-            this.start_byte.Name = "start_byte";
-            this.start_byte.Visible = false;
-            // 
-            // start_sector
-            // 
-            this.start_sector.HeaderText = "start_sector";
-            this.start_sector.Name = "start_sector";
-            this.start_sector.Visible = false;
+            this.materialLabel4.Text = "Veri Yedek Tipi";
             // 
             // Form1
             // 
@@ -481,7 +481,7 @@
             this.Name = "Form1";
             this.Sizable = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "One Dumper @caneray-OneTeam";
+            this.Text = "One Dumper @caneray-OneTeam (V1.0.3)";
             ((System.ComponentModel.ISupportInitialize)(this.partList)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.log)).EndInit();
             this.ResumeLayout(false);
